@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 #[macro_use]
 extern crate lazy_static;
 
@@ -165,6 +167,8 @@ pub mod readability {
                 "dnt$",
             ]
         ).unwrap();
+
+        static ref VALID_REGEX: Regex = Regex::new(r"[^aeiouy]+").unwrap();
     );
 
     pub fn flesch_kincaid_grade_level(words: f32, sentences: f32, syllables: f32) -> f32 {
@@ -175,39 +179,117 @@ pub mod readability {
         (206.835 - (1.015 * (words / sentences))) - (84.6 * (syllables / words))
     }
 
-    pub fn estimate_syllables(word: &str) -> i32 {
-        let re = Regex::new(r"[^aeiouy]+").unwrap();
+    // Credit
+    // https://www.dotnetperls.com/word-count-rust
+    pub fn count_words(s: &str) -> usize {
+        let mut total = 0;
+        let mut previous = char::MAX;
+        for c in s.chars() {
+            // If previous char is whitespace, we are on a new word.
+            if previous.is_ascii_whitespace() {
+                // New word has alphabetic, digit or punctuation start.
+                if c.is_ascii_alphabetic() || c.is_ascii_digit() || c.is_ascii_punctuation() {
+                    total += 1;
+                }
+            }
+            // Set previous.
+            previous = c;
+        }
+        if s.len() >= 1 {
+            total += 1
+        }
+        total
+    }
 
-        let valid_parts = re.find_iter(word)
-            .collect::<Vec<_>>()
+    pub fn count_sentences(s: &str) {
+        return ()
+    }
+
+    pub fn _tokenizer(s: &str) -> Vec<String> {
+        let mut idx = 0;
+        let mut window = 0;
+        let mut previous = char::MAX;
+        let mut tokens: Vec<String> = vec![];
+        for c in s.chars() {
+            // If previous char is whitespace, we are on a new word.
+            if previous.is_ascii_whitespace() {
+                // We have a new word, send to tokens list
+                tokens.push(s.get(idx - window..idx - 1).unwrap().to_string());
+                window = 0;
+            }
+            // Set previous.
+            previous = c;
+            idx += 1;
+            window += 1;
+        }
+        //Get last token
+        tokens.push(s.get(idx - window..idx - 1).unwrap().to_string());
+
+        return tokens
+    }
+
+    // A (rough) Rust implementation of spaCy's Sentencizer class
+    // https://github.com/explosion/spaCy/blob/master/spacy/pipeline/sentencizer.pyx
+    // fn _sentencizer(doc: &str) -> () {
+    //     if doc.is_empty() {
+    //         // Handle cases where there are no tokens in any docs.
+    //         let guesses = [[]];
+    //         return guesses;
+    //     }
+    //     let guesses: Vec<_> = vec![];
+    //     doc_guesses = [False] * doc.len();
+    //     if len(doc) > 0:
+    //         start = 0
+    //         seen_period = False
+    //         doc_guesses[0] = True
+    //         for i, token in enumerate(doc):
+    //             is_in_punct_chars = token.text in self.punct_chars
+    //             if seen_period and not token.is_punct and not is_in_punct_chars:
+    //                 doc_guesses[start] = True
+    //                 start = token.i
+    //                 seen_period = False
+    //             elif is_in_punct_chars:
+    //                 seen_period = True
+    //         if start < len(doc):
+    //             doc_guesses[start] = True
+    //     guesses.append(doc_guesses)
+    //     return guesses
+    // }
+
+    // This is a Rust implementation of the Python package syllables
+    // https://github.com/prosegrinder/python-syllables/tree/main
+    pub fn estimate_syllables(word: &str) -> usize {
+        let valid_parts: usize = VALID_REGEX.split(word)
+            .collect::<Vec<&str>>()
             .len();
 
         // println!("{:?}", valid_parts);
 
-        let sub_matches = SUB_REGEX.matches(word)
+        let sub_matches: usize = SUB_REGEX.matches(word)
             .into_iter()
-            .collect::<Vec<_>>()
+            .collect::<Vec<usize>>()
             .len();
         
         // println!("{:?}", sub_matches);
 
-        let add_matches = ADD_REGEX.matches(word)
+        let add_matches: usize = ADD_REGEX.matches(word)
             .into_iter()
-            .collect::<Vec<_>>()
+            .collect::<Vec<usize>>()
             .len();
 
         // println!("{:?}", add_matches);
 
-        let syll_out = valid_parts + add_matches - sub_matches;
+        let syll_out: usize = valid_parts + add_matches - sub_matches;
 
-        if syll_out == 0 {
+        if syll_out <= 0 {
             return 1;
         } else {
-            return syll_out as i32;
+            return syll_out;
         }
     }
 }
 fn main() {
-    let read = readability::estimate_syllables("Portly");
+    let now = Instant::now();
+    let read = readability::_tokenizer("dry run let's go..");
     println!("{:?}", read)
 }
