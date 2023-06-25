@@ -210,11 +210,17 @@ pub mod readability {
         let mut window = 0;
         let mut previous = char::MAX;
         let mut tokens: Vec<String> = vec![];
+        
         for c in s.chars() {
-            // If previous char is whitespace, we are on a new word.
+            // If previous char is whitespace and current char is not, we are on a new word.
             if previous.is_ascii_whitespace() {
                 // We have a new word, send to tokens list
                 tokens.push(s.get(idx - window..idx - 1).unwrap().to_string());
+                window = 0;
+            // If current char is an apostophe (POS) or a full stop (PUNCT)
+            } else if c == '\'' ||  c == '.' {
+                // Don't need to offset for whitespace
+                tokens.push(s.get(idx - window..idx).unwrap().to_string());
                 window = 0;
             }
             // Set previous.
@@ -223,7 +229,9 @@ pub mod readability {
             window += 1;
         }
         //Get last token
-        tokens.push(s.get(idx - window..idx - 1).unwrap().to_string());
+        tokens.push(s.get(idx - window..idx).unwrap().to_string());
+
+        tokens = tokens.into_iter().filter(|x| !x.is_empty()).collect();
 
         return tokens
     }
@@ -288,8 +296,9 @@ pub mod readability {
         }
     }
 }
+
 fn main() {
     let now = Instant::now();
-    let read = readability::_tokenizer("dry run let's go..");
+    let read = readability::_tokenizer("You'll     regret this Mr. Anderson");
     println!("{:?}", read)
 }
