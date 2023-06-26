@@ -173,6 +173,18 @@ pub mod readability {
         static ref VALID_REGEX: Regex = Regex::new(r"[^aeiouy]+").unwrap();
     );
 
+    #[derive(Debug)]
+    pub struct Token {
+        i: usize,
+        idx: usize,
+        text: String
+    }
+
+    pub struct Doc {
+        tokens: Vec<Token>,
+        text: String,
+    }
+
     pub fn flesch_kincaid_grade_level(words: f32, sentences: f32, syllables: f32) -> f32 {
         (0.39 * (words / sentences)) + (11.8 * (syllables / words) - 15.59)
     }
@@ -207,39 +219,70 @@ pub mod readability {
         return ()
     }
 
-    pub fn _tokenizer(s: &str) -> Vec<String> {
-        let mut idx = 0;
-        let mut window = 0;
+    pub fn _tokenizer(s: &str) -> Vec<Token> {
+        let mut idx: usize = 0;
+        let mut window: usize = 0;
+        let mut ws_offset: usize = 0;
         let mut previous = char::MAX;
-        let mut tokens: Vec<String> = vec![];
+        let mut tokens: Vec<Token> = vec![];
         
         for c in s.chars() {
             // If previous char is whitespace and current char is not, we are on a new word.
-            if previous.is_ascii_whitespace() {
+            if previous.is_ascii_whitespace() && !c.is_ascii_whitespace() {
                 // We have a new word, send to tokens list
-                tokens.push(s.get(idx - window..idx - 1).unwrap().to_string());
+                // if !s.get(idx - window..idx - 1).is_none() {
+                    tokens.push(
+                        Token{
+                            i: tokens.len() + 1, 
+                            idx: idx - window, 
+                            text: s.get(idx - window..idx - ws_offset)
+                                .unwrap()
+                                .to_string()
+                        }
+                    );
+                //};
                 window = 0;
+                ws_offset = 0;
             // If current char is an apostophe (POS) or a full stop (PUNCT)
             } else if c == '\'' ||  c == '.' {
                 // Don't need to offset for whitespace
-                tokens.push(s.get(idx - window..idx).unwrap().to_string());
+                tokens.push(
+                    Token{
+                        i: tokens.len() + 1, 
+                        idx: idx - window, 
+                        text: s.get(idx - window..idx - ws_offset)
+                            .unwrap()
+                            .to_string()
+                        }
+                );
                 window = 0;
+                ws_offset = 0;
             }
             // Set previous.
             previous = c;
             idx += 1;
             window += 1;
+
+            if c.is_ascii_whitespace() {
+                ws_offset += 1;
+            };
         }
         //Get last token
-        tokens.push(s.get(idx - window..idx).unwrap().to_string());
-
-        tokens = tokens.into_iter().filter(|x| !x.is_empty()).collect();
+        tokens.push(
+            Token{
+                i: tokens.len() + 1, 
+                idx: idx - window, 
+                text: s.get(idx - window..idx)
+                    .unwrap()
+                    .to_string()
+                }
+        );
 
         return tokens
     }
 
-    // A (rough) Rust implementation of spaCy's Sentencizer class
-    // https://github.com/explosion/spaCy/blob/master/spacy/pipeline/sentencizer.pyx
+    // // A (rough) Rust implementation of spaCy's Sentencizer class
+    // // https://github.com/explosion/spaCy/blob/master/spacy/pipeline/sentencizer.pyx
     // fn _sentencizer(doc: &str) -> Vec<&str> {
     //     if doc.is_empty() {
     //         // Handle cases where there are no tokens in any docs.
