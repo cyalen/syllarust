@@ -171,18 +171,41 @@ pub mod readability {
         ).unwrap();
 
         static ref VALID_REGEX: Regex = Regex::new(r"[^aeiouy]+").unwrap();
+
+        static ref DEFAULT_PUNCT: Vec<&'static str> = vec![
+            "!", ".", "?", "։", "؟", "۔", "܀", "܁", "܂", "߹",
+            "।", "॥", "၊", "။", "።", "፧", "፨", "᙮", "᜵", "᜶", "᠃", "᠉", "᥄",
+            "᥅", "᪨", "᪩", "᪪", "᪫", "᭚", "᭛", "᭞", "᭟", "᰻", "᰼", "᱾", "᱿",
+            "‼", "‽", "⁇", "⁈", "⁉", "⸮", "⸼", "꓿", "꘎", "꘏", "꛳", "꛷", "꡶",
+            "꡷", "꣎", "꣏", "꤯", "꧈", "꧉", "꩝", "꩞", "꩟", "꫰", "꫱", "꯫", "﹒",
+            "﹖", "﹗", "！", "．", "？", "𐩖", "𐩗", "𑁇", "𑁈", "𑂾", "𑂿", "𑃀",
+            "𑃁", "𑅁", "𑅂", "𑅃", "𑇅", "𑇆", "𑇍", "𑇞", "𑇟", "𑈸", "𑈹", "𑈻", "𑈼",
+            "𑊩", "𑑋", "𑑌", "𑗂", "𑗃", "𑗉", "𑗊", "𑗋", "𑗌", "𑗍", "𑗎", "𑗏", "𑗐",
+            "𑗑", "𑗒", "𑗓", "𑗔", "𑗕", "𑗖", "𑗗", "𑙁", "𑙂", "𑜼", "𑜽", "𑜾", "𑩂",
+            "𑩃", "𑪛", "𑪜", "𑱁", "𑱂", "𖩮", "𖩯", "𖫵", "𖬷", "𖬸", "𖭄", "𛲟", "𝪈",
+            "｡", "。"
+        ];
     );
 
     #[derive(Debug)]
     pub struct Token {
-        i: usize,
-        idx: usize,
-        text: String
+        pub i: usize,
+        pub idx: usize,
+        pub text: String
     }
 
     pub struct Doc {
-        tokens: Vec<Token>,
-        text: String,
+        pub tokens: Vec<Token>,
+        pub text: String,
+    }
+
+    impl Doc {
+        pub fn new (text: String) -> Doc {
+            Doc {
+                tokens: _tokenizer(&text),
+                text: text
+            }
+        }
     }
 
     pub fn flesch_kincaid_grade_level(words: f32, sentences: f32, syllables: f32) -> f32 {
@@ -219,7 +242,8 @@ pub mod readability {
         return ()
     }
 
-    pub fn _tokenizer(s: &str) -> Vec<Token> {
+    // Need to be able to split ! in tokenizer
+    pub fn _tokenizer(s: &String) -> Vec<Token> {
         let mut idx: usize = 0;
         let mut window: usize = 0;
         let mut ws_offset: usize = 0;
@@ -283,40 +307,40 @@ pub mod readability {
 
     // // A (rough) Rust implementation of spaCy's Sentencizer class
     // // https://github.com/explosion/spaCy/blob/master/spacy/pipeline/sentencizer.pyx
-    // fn _sentencizer(doc: &str) -> Vec<&str> {
-    //     if doc.is_empty() {
-    //         // Handle cases where there are no tokens in any docs.
-    //         let guesses: Vec<_> = vec![[]];
-    //         return guesses;
-    //     }
-    //     let mut guesses: Vec<_> = vec![];
-    //     let mut doc_guesses: Vec<bool> = vec![false; doc.len()];
-    //     if doc.len() > 0 {
-    //         let mut start = 0;
-    //         let mut seen_period = false;
-    //         doc_guesses[0] = true;
-    //         // Need to implement basic Token object
-    //         for (i, c) in doc.chars().enumerate() {
-    //             // pass
+    pub fn _sentencizer(doc: &Doc) -> Vec<bool> {
+        if doc.text.is_empty() {
+            // Handle cases where there are no tokens in any docs.
+            let guesses: Vec<_> = vec![];
+            return guesses;
+        }
+        // let mut guesses: Vec<bool> = vec![];
+        let mut doc_guesses: Vec<bool> = vec![false; doc.tokens.len()];
+        if doc.tokens.len() > 0 {
+            let mut start = 0;
+            let mut seen_period = false;
+            doc_guesses[0] = true;
             
-    //         //     is_in_punct_chars = token.text in self.punct_chars
-    //         //     if seen_period and not token.is_punct and not is_in_punct_chars:
-    //         //         doc_guesses[start] = True
-    //         //         start = token.i
-    //         //         seen_period = False
-    //         //     elif is_in_punct_chars:
-    //         //         seen_period = True
-    //         // }
-    //         // if start < len(doc):
-    //         //     doc_guesses[start] = True
-    //         }
-    //     } else {
-    //         // pass
-    //     }
-    //     // guesses.append(doc_guesses);
-    //     // return guesses
+            for token in doc.tokens.iter() {
+                let is_in_punct_chars: bool = DEFAULT_PUNCT.contains(&&token.text[..]);
+
+                if seen_period && !token.text.chars().any(|x| x.is_ascii_punctuation()) && !is_in_punct_chars {
+                    doc_guesses[start] = true;
+                    start = token.i;
+                    seen_period = false;
+                } else if is_in_punct_chars {
+                    seen_period = true;
+                }
+            }
+
+            if start < doc.tokens.len() {
+                doc_guesses[start] = true;
+            }
+
+        }
+        //guesses.append(&mut doc_guesses);
         
-    // }
+        return doc_guesses
+    }
 
     // This is a Rust implementation of the Python package syllables
     // https://github.com/prosegrinder/python-syllables/tree/main
@@ -353,6 +377,8 @@ pub mod readability {
 
 fn main() {
     let now = Instant::now();
-    let read = readability::_tokenizer("You'll     regret this Mr. Anderson");
-    println!("{:?}", read)
+    let doc = readability::Doc::new(String::from("You'll     regret this Mr. Anderson. This happens again!"));
+    let read = readability::_sentencizer(&doc);
+    println!("{:?}", read);
+    println!("{:?}", doc.tokens.iter().map(|x| &x.text).collect::<Vec<&String>>());
 }
