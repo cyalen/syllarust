@@ -268,7 +268,7 @@ pub mod readability {
                 window = 0;
                 ws_offset = 0;
             // If current char is an apostophe (POS) or a full stop (PUNCT)
-            } else if c == '\'' ||  c == '.' {
+            } else if c == '\'' ||  DEFAULT_PUNCT.contains(&&*c.to_string()) {
                 // Don't need to offset for whitespace
                 tokens.push(
                     Token{
@@ -322,6 +322,9 @@ pub mod readability {
             
             for token in doc.tokens.iter() {
                 let is_in_punct_chars: bool = DEFAULT_PUNCT.contains(&&token.text[..]);
+                
+                println!("{:?}", token);
+                println!("{:?}", seen_period);
 
                 if seen_period && !token.text.chars().any(|x| x.is_ascii_punctuation()) && !is_in_punct_chars {
                     doc_guesses[start] = true;
@@ -381,4 +384,5 @@ fn main() {
     let read = readability::_sentencizer(&doc);
     println!("{:?}", read);
     println!("{:?}", doc.tokens.iter().map(|x| &x.text).collect::<Vec<&String>>());
+    println!("{:?}", Instant::now() - now)
 }
