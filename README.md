@@ -1,12 +1,12 @@
 # syllable-rs
-A simple syllable counter for implemented natively in Rust. This is based on the work of the [python-syllables team](https://github.com/prosegrinder/python-syllables), which implents the same functionality in Python.
+A simple syllable counter implemented natively in Rust. This is based on the work of the [python-syllables team](https://github.com/prosegrinder/python-syllables), which implents the same functionality in Python.
 
-My goal is to extend or improve upon this work in future iterations. That said, based on my understanding of the current state of working with regex in Rust - Python has some considerable advantages in terms of simplicity and speed over Rust for this particular use case. I hope that as time goes on, I'll be able to incorporate new features/crates that will help close this gap.
+My goal was to bring the same ease/simplicity to Rust - and use Rust's fearless concurrency model to help improve the speed/quality at which syllable counts can be generated. This means if you're trying to generate syllable counts for large NLP/LLM applications where speed matters, this may be the crate you're looking for!
 
-### Rust vs. Python comparison
-
+## Parallelism snippet using Rayon
 ```Rust
-use::syllable-rs;
+use syllable-rs::estimate_syllables;
+use rayon::prelude::*;
 
 fn main() {
     let test_strs: Vec<&str> = vec![
@@ -16,38 +16,19 @@ fn main() {
         "Pontificate",
         "Hello"
     ];
-    thread::spawn(move || {
-        for s in test_strs.iter() {
-            println!("{:?}", estimate_syllables(s));
-        }
-    });
+    
+    let start = Instant::now();
+    let results: Vec<usize> = test_strs.par_iter()
+        .map(|s| estimate_syllables(s))
+        .collect();
+
+    let stop = Instant::now();
+    println!("{:?}", stop - start);
+    println!("{:?}", results);
 }
 ```
 
-```Python
-import syllables
-import concurrent
-
-li = [
-        "Apple",
-        "Tart",
-        "plate",
-        "Pontificate",
-        "Hello"
-    ]
-
-num_threads = len(li)
-results = []
-with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
-    # Start the operations and mark each future with its thread name
-    future_to_thread = {executor.submit(syllables.estimate, li[i]): i for i in range(num_threads)}
-    
-    # Retrieve the results as they complete
-    for future in concurrent.futures.as_completed(future_to_thread):
-        thread_name = future_to_thread[future]
-        results.append(future.result())
-```
-
-This is currently a work-in-progress repo. If you find it useful and would like to contribute, feel free to submit a PR. If you have any feature requests/spot a bug, leave me an issue and I'll try and tackle it when I can.
+## Contributions/Issues
+This is currently a work-in-progress repo. If you have any feature requests/spot a bug, leave me an issue and I'll try and tackle it when I can. I'm also open to sensible PRs.
 
 If you're a more experienced Rust dev and you spy any inefficiencies, I'd be grateful for your feedback. I'm a relatively new Rustacean :crab: who works full-time as a Python-native ML Engineer, and therefore I might do dumb things sometimes.

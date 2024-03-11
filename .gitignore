@@ -3,3 +3,4 @@
 *.ipynb
 *.vscode
 *.pytest_cache
+*.lock
