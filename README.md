@@ -1,11 +1,11 @@
-# syllable-rs
+# syllarust
 A simple syllable counter implemented natively in Rust. This is based on the work of the [python-syllables team](https://github.com/prosegrinder/python-syllables), which implents the same functionality in Python.
 
 My goal was to bring the same ease/simplicity to Rust - and use Rust's fearless concurrency model to help improve the speed/quality at which syllable counts can be generated. This means if you're trying to generate syllable counts for large NLP/LLM applications where speed matters, this may be the crate you're looking for!
 
 ## Parallelism snippet using Rayon
 ```Rust
-use syllable-rs::estimate_syllables;
+use syllarust::estimate_syllables;
 use rayon::prelude::*;
 
 fn main() {

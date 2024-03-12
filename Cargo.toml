@@ -1,7 +1,11 @@
 [package]
-name = "syllable-rs"
+name = "syllarust"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
+description = "A simple crate for quickly counting syllables"
+repository = "https://github.com/cyalen/syllable-rs"
+readme = "README.md"
 authors = ["cyalen"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
