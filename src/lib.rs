@@ -166,6 +166,30 @@ lazy_static!(
     static ref VALID_REGEX: Regex = Regex::new(r"[^aeiouy]+").unwrap();
 );
 
+pub fn count_words(text: &str) -> usize {
+    return text.split_whitespace().count()
+}
+
+pub fn count_tokens(text: &str) -> usize {
+    let words_and_punct: Vec<&str> = text.split_whitespace().collect();
+    let mut result  = vec![];
+
+    let r: Regex  =  Regex::new(r"[-.,!?;:]").unwrap();
+    for word in words_and_punct {
+        let punct_span = r.find(word);
+
+        if punct_span.is_none() {
+            result.push(word);
+        } else {
+            result.push(&word[..punct_span.unwrap().range().start]);
+            result.push(&word[punct_span.unwrap().range().start..punct_span.unwrap().range().end]);
+            result.push(&word[punct_span.unwrap().range().end..]);
+        }
+    }
+
+    return result.iter().filter(|x| **x != "").collect::<Vec<&&str>>().len();
+}
+
 pub fn estimate_syllables(word: &str) -> usize {
     if word.len() < 1 {
         return 0;
@@ -248,4 +272,23 @@ mod tests {
     fn test_estimate_syllables_hyphens() {
         assert_eq!(estimate_syllables("free-for-all"), 3)
     }
+
+    #[test]
+    fn test_count_words() {
+        assert_eq!(count_words("Hello, world!"), 2);
+        assert_eq!(count_words("hyper-mode"), 1);
+        assert_eq!(count_words("Hello, world! This is a test."), 6);
+        assert_eq!(count_words("Hello, world! This is a test.  "), 6);
+        assert_eq!(count_words("Hello, world! This is a test.  \n"), 6);
+    }
+
+    #[test]
+    fn test_count_tokens() {
+        assert_eq!(count_tokens("Hello, world!"), 4);
+        assert_eq!(count_tokens("hyper-mode"), 3);
+        assert_eq!(count_tokens("Hello, world! This is a test."), 9);
+        assert_eq!(count_tokens("Hello, world! This is a test.  "), 9);
+        assert_eq!(count_tokens("Hello, world! This is a test.  \n"), 9);
+    }
+    
 }
