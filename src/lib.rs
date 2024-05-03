@@ -171,24 +171,31 @@ pub fn count_words(text: &str) -> usize {
 }
 
 pub fn count_tokens(text: &str) -> usize {
+    return _tokens_vec(text).len();
+}
+
+fn _tokens_vec(text: &str) -> Vec<&str> {
     let words_and_punct: Vec<&str> = text.split_whitespace().collect();
-    let mut result  = vec![];
+    let mut tokens: Vec<&str>  = vec![];
 
     let r: Regex  =  Regex::new(r"[-.,!?;:]").unwrap();
     for word in words_and_punct {
         let punct_span = r.find(word);
 
         if punct_span.is_none() {
-            result.push(word);
+            tokens.push(word);
         } else {
-            result.push(&word[..punct_span.unwrap().range().start]);
-            result.push(&word[punct_span.unwrap().range().start..punct_span.unwrap().range().end]);
-            result.push(&word[punct_span.unwrap().range().end..]);
+            tokens.push(&word[..punct_span.unwrap().range().start]);
+            tokens.push(&word[punct_span.unwrap().range().start..punct_span.unwrap().range().end]);
+            tokens.push(&word[punct_span.unwrap().range().end..]);
         }
     }
 
-    return result.iter().filter(|x| **x != "").collect::<Vec<&&str>>().len();
+    let result: Vec<&str> = tokens.into_iter().filter(|x| *x != "").collect::<Vec<&str>>();
+
+    return result;
 }
+
 
 pub fn estimate_syllables(word: &str) -> usize {
     if word.len() < 1 {
@@ -289,6 +296,7 @@ mod tests {
         assert_eq!(count_tokens("Hello, world! This is a test."), 9);
         assert_eq!(count_tokens("Hello, world! This is a test.  "), 9);
         assert_eq!(count_tokens("Hello, world! This is a test.  \n"), 9);
+        assert_eq!(count_tokens("Hello, world!\nThis can't be a test.  \n"), 10);
     }
     
 }
