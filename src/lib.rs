@@ -1,5 +1,6 @@
-use regex::Regex;
-use rayon::prelude::*;
+use regex::{Regex, Matches};
+use rayon::prelude::{*};
+use std::cmp::min;
 
 #[macro_use]
 extern crate lazy_static;
@@ -170,11 +171,41 @@ pub fn count_words(text: &str) -> usize {
     return text.split_whitespace().count()
 }
 
-pub fn count_tokens(text: &str) -> usize {
-    return _tokens_vec(text).len();
+pub fn count_sentences(text: &str) -> usize {
+    return sentence_vec(text).len();
 }
 
-fn _tokens_vec(text: &str) -> Vec<&str> {
+fn sentence_vec(text: &str) -> Vec<&str> {
+    let r: Regex = Regex::new(r"[.!?\n]").unwrap();
+    let terminators: Matches = r.find_iter(text);
+    let mut offset: usize = 0;
+    let mut result: Vec<&str> = vec![];
+    for t in terminators {
+        // If we are at a newline character...
+        if &text[t.start()..t.end()] == "\n" {
+            // We don't want to include it in the vector
+            result.push(&text[offset..min(t.start(), text.len())]);
+            offset = min(t.end(), text.len());
+            continue;
+        }
+
+        result.push(&text[offset..t.end()]);
+        if &text[t.end()..min(t.end() + 1, text.len())] == " " {
+            offset = min(t.end() + 1, text.len());
+        } else {
+            offset = min(t.end(), text.len());
+        }
+    }
+    result = result.into_iter().filter(|x| !x.chars().all(|y| y  == ' ')).collect::<Vec<&str>>();
+
+    return result;
+}
+
+pub fn count_tokens(text: &str) -> usize {
+    return tokens_vec(text).len();
+}
+
+fn tokens_vec(text: &str) -> Vec<&str> {
     let words_and_punct: Vec<&str> = text.split_whitespace().collect();
     let mut tokens: Vec<&str>  = vec![];
 
@@ -191,7 +222,7 @@ fn _tokens_vec(text: &str) -> Vec<&str> {
         }
     }
 
-    let result: Vec<&str> = tokens.into_iter().filter(|x| *x != "").collect::<Vec<&str>>();
+    let result: Vec<&str> = tokens.into_iter().filter(|x| *x != "" && *x != " ").collect::<Vec<&str>>();
 
     return result;
 }
@@ -298,5 +329,20 @@ mod tests {
         assert_eq!(count_tokens("Hello, world! This is a test.  \n"), 9);
         assert_eq!(count_tokens("Hello, world!\nThis can't be a test.  \n"), 10);
     }
-    
-}
+
+    #[test]
+    fn test_sentence_vec() {
+        assert_eq!(sentence_vec("Hello, world!"), vec!["Hello, world!"]);
+        assert_eq!(sentence_vec("Hello, world! This is a test.  \n"), vec![ "Hello, world!", "This is a test."]);
+        assert_eq!(sentence_vec("Hello, world!\nThis can't be a test.  \n"), vec![ "Hello, world!", "This can't be a test."]);
+    }
+
+    #[test]
+    fn test_count_sentences() {
+        assert_eq!(count_sentences("Hello, world! \nThis is some text.\n - And this is\n - A bullet list\n - Did it come out alright?\n"), 5);
+        assert_eq!(count_sentences("Hello, world! This is a test."), 2);
+        assert_eq!(count_sentences("Hello, world! This is a test.  "), 2);
+        assert_eq!(count_sentences("Hello, world! This is a test.  \n"), 2);
+        assert_eq!(count_sentences("Hello, world!\nThis can't be a test.  \n"), 2);
+    }
+ }
