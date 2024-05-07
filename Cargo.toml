@@ -7,6 +7,8 @@ description = "A simple crate for quickly counting syllables"
 repository = "https://github.com/cyalen/syllable-rs"
 readme = "README.md"
 authors = ["cyalen"]
+keywords = ["syllables", "NLP", "text", "language"]
+categories = ["Text processing"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
