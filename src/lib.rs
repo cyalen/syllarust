@@ -1,3 +1,48 @@
+/*! Syllarust - A Rust library for estimating syllables and other text metrics.
+This is still a work in progress, but the goal is to provide a simple library for estimating syllables in English words, as well as other text metrics counting words, sentences, and tokens.
+
+The example below uses the `rayon` crate for parallel processing, but this is not necessary for the library to work. The library is designed to take advantage of Rust's fearless concucrrency features, but use it how you'd like!
+
+```rust
+use syllarust::estimate_syllables;
+use rayon::prelude::*;
+
+fn main() {
+    let test_strs: Vec<&str> = vec![
+        "Apple",
+        "Tart",
+        "plate",
+        "Pontificate",
+        "Hello"
+    ];
+    
+    let start = Instant::now();
+    let results: Vec<usize> = test_strs.par_iter()
+        .map(|s| estimate_syllables(s))
+        .collect();
+
+    let stop = Instant::now();
+    println!("{:?}", stop - start);
+    println!("{:?}", results);
+}
+```
+
+Additionally, the library provides functions for counting words, sentences, and tokens in a text. These functions are `count_words`, `count_sentences`, and `count_tokens`, respectively.
+
+```rust
+use syllarust::{count_words, count_sentences, count_tokens};
+
+fn main() {
+    let test_str: &str = "Hello, world! This is a test.";
+    println!("Words: {}", count_words(test_str));
+    println!("Sentences: {}", count_sentences(test_str));
+    println!("Tokens: {}", count_tokens(test_str));
+}
+```
+
+For additional information, please see the documentation for the individual functions themselves.
+*/
+
 use regex::{Regex, Matches};
 use rayon::prelude::{*};
 use std::cmp::min;
@@ -167,15 +212,20 @@ lazy_static!(
     static ref VALID_REGEX: Regex = Regex::new(r"[^aeiouy]+").unwrap();
 );
 
+// Counts the number of words in a text, defined as a sequence of characters separated by whitespace.
 pub fn count_words(text: &str) -> usize {
     return text.split_whitespace().count()
 }
 
+// Counts the number of sentences in a text, defined as a sequence of characters ending in a period, exclamation point, question mark or line break.
+// Equivalent to `sentence_vec(text).len()` - provided as a convenience function.
 pub fn count_sentences(text: &str) -> usize {
     return sentence_vec(text).len();
 }
 
-fn sentence_vec(text: &str) -> Vec<&str> {
+// Splits a text into a vector of sentences (as str slices), defined as a sequence of characters ending in a period, exclamation point, question mark or line break.
+// Line breaks and whitespace are not included in the vector.
+pub fn sentence_vec(text: &str) -> Vec<&str> {
     let r: Regex = Regex::new(r"[.!?\n]").unwrap();
     let terminators: Matches = r.find_iter(text);
     let mut offset: usize = 0;
@@ -201,11 +251,15 @@ fn sentence_vec(text: &str) -> Vec<&str> {
     return result;
 }
 
+// Counts the number of tokens in a text, defined as a sequence of characters separated by whitespace or punctuation.
+// Equivalent to `tokens_vec(text).len()` - provided as a convenience function.
 pub fn count_tokens(text: &str) -> usize {
     return tokens_vec(text).len();
 }
 
-fn tokens_vec(text: &str) -> Vec<&str> {
+// Splits a text into a vector of tokens (as str slices), defined as a sequence of characters separated by whitespace or punctuation.
+// Punctuation is included as a separate token.
+pub fn tokens_vec(text: &str) -> Vec<&str> {
     let words_and_punct: Vec<&str> = text.split_whitespace().collect();
     let mut tokens: Vec<&str>  = vec![];
 
@@ -227,7 +281,7 @@ fn tokens_vec(text: &str) -> Vec<&str> {
     return result;
 }
 
-
+// Estimates the number of syllables in a word. This is a simple heuristic that is not perfect, but should work for most English words.
 pub fn estimate_syllables(word: &str) -> usize {
     if word.len() < 1 {
         return 0;
