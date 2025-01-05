@@ -46,9 +46,32 @@ For additional information, please see the documentation for the individual func
 use regex::{Regex, Matches};
 use rayon::prelude::{*};
 use std::cmp::min;
+use lazy_static::lazy_static;
+use pyo3::prelude::*;
 
-#[macro_use]
-extern crate lazy_static;
+#[pyfunction]
+fn syllable_estimate(text: String) -> PyResult<usize> {
+    Ok(estimate_syllables(&text))
+}
+
+#[pyfunction]
+fn token_count(text: String) -> PyResult<usize> {
+    Ok(count_tokens(&text))
+}
+
+#[pyfunction]
+fn sentence_count(text: String) -> PyResult<usize> {
+    Ok(count_sentences(&text))
+}
+
+/// A Python module implemented in Rust.
+#[pymodule]
+fn syllarust(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(syllable_estimate, m)?)?;
+    m.add_function(wrap_pyfunction!(token_count, m)?)?;
+    m.add_function(wrap_pyfunction!(sentence_count, m)?)?;
+    Ok(())
+}
 
 lazy_static!(
     static ref ADD_REGEX: [Regex; 123] = [
@@ -212,6 +235,32 @@ lazy_static!(
     static ref VALID_REGEX: Regex = Regex::new(r"[^aeiouy]+").unwrap();
 );
 
+struct NLP {
+
+}
+
+struct Doc {
+    words: Vec<Token>,
+}
+
+struct Token {
+    doc: Doc,
+    offset: i32,
+    len: i32
+}
+
+struct Span {
+
+}
+
+// impl NLP {
+//     fn new(text: &str) -> Doc {
+//         let doc: Doc = Doc {words: None};
+//         tokens_vec(text).iter().map(|x|)
+//         return Doc {words: tokens_vec(text)};
+//     }
+// }
+
 // Counts the number of words in a text, defined as a sequence of characters separated by whitespace.
 pub fn count_words(text: &str) -> usize {
     return text.split_whitespace().count()
@@ -335,6 +384,58 @@ pub fn estimate_syllables(word: &str) -> usize {
     }
 }
 
+// Estimates the number of syllables in a word. This is a simple heuristic that is not perfect, but should work for most English words.
+pub fn estimate_syllables_new(word: &str) -> usize {
+    if word.len() < 1 {
+        return 0;
+    }
+
+    // Initialise counters
+    let mut sub_counter: usize = 0;
+    let mut add_counter: usize = 0;
+
+    // Matches will be case-insensitive
+    let l_word: &str = &word.to_lowercase()[..];
+
+    // Split and count "valid" syllable part candidates
+    let valid_parts: usize = VALID_REGEX.split(l_word)
+        .filter(|x| !x.is_empty())
+        .count();
+
+    // Increment counter for regex patterns we need to subtract from our total (patterns that merge syllables)
+    sub_counter += SUB_REGEX.iter()
+        .filter(|x| x.captures(l_word).is_some())
+        .count();
+
+    // Increment counter for regex matches we need to add to our counter (patterns that create syllables)
+    let add_caps: Vec<Option<regex::Captures<'_>>> = ADD_REGEX.par_iter()
+        .map(|x| x.captures(l_word))
+        .filter(|x| x.is_some())
+        .collect::<Vec<_>>();
+
+    add_counter += add_caps.len();
+
+    // Check add captures for 
+    sub_counter += add_caps.par_iter()
+        .map(
+            |x| VALID_REGEX.split(
+                    x.as_ref()
+                    .unwrap()
+                    .get(0)
+                    .unwrap()
+                    .as_str()
+            ).filter(|y| !y.is_empty()).collect::<Vec<&str>>().len()
+        ).collect::<Vec<usize>>().par_iter().sum::<usize>();
+
+    let syll_out: usize = valid_parts + add_counter - sub_counter;
+
+    if syll_out <= 0 {
+        return 1;
+    } else {
+        return syll_out;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
@@ -363,6 +464,31 @@ mod tests {
     #[test]
     fn test_estimate_syllables_hyphens() {
         assert_eq!(estimate_syllables("free-for-all"), 3)
+    }
+
+    #[test]
+    fn test_estimate_syllables_new() {
+        assert_eq!(estimate_syllables_new("Apple"), 2);
+        assert_eq!(estimate_syllables_new("Tart"), 1);
+        assert_eq!(estimate_syllables_new("plate"), 1); 
+        assert_eq!(estimate_syllables_new("Pontificate"), 4);
+        assert_eq!(estimate_syllables_new("hello"), 2);
+        assert_eq!(estimate_syllables_new("elephant"), 3);
+        assert_eq!(estimate_syllables_new("programming"), 3);
+        assert_eq!(estimate_syllables_new("extravaganza"), 5);
+        assert_eq!(estimate_syllables_new("syllable"), 3);
+        assert_eq!(estimate_syllables_new("onomatopoeia"), 3);
+        assert_eq!(estimate_syllables_new("juxtaposition"), 4);
+    }
+
+    #[test]
+    fn test_estimate_syllables_blank_new() {
+        assert_eq!(estimate_syllables_new(""), 0);
+    }
+
+    #[test]
+    fn test_estimate_syllables_hyphens_new() {
+        assert_eq!(estimate_syllables_new("free-for-all"), 3)
     }
 
     #[test]
