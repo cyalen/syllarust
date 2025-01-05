@@ -235,32 +235,6 @@ lazy_static!(
     static ref VALID_REGEX: Regex = Regex::new(r"[^aeiouy]+").unwrap();
 );
 
-struct NLP {
-
-}
-
-struct Doc {
-    words: Vec<Token>,
-}
-
-struct Token {
-    doc: Doc,
-    offset: i32,
-    len: i32
-}
-
-struct Span {
-
-}
-
-// impl NLP {
-//     fn new(text: &str) -> Doc {
-//         let doc: Doc = Doc {words: None};
-//         tokens_vec(text).iter().map(|x|)
-//         return Doc {words: tokens_vec(text)};
-//     }
-// }
-
 // Counts the number of words in a text, defined as a sequence of characters separated by whitespace.
 pub fn count_words(text: &str) -> usize {
     return text.split_whitespace().count()
