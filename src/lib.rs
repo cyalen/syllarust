@@ -320,60 +320,6 @@ pub fn estimate_syllables(word: &str) -> usize {
     // Split and count "valid" syllable part candidates
     let valid_parts: usize = VALID_REGEX.split(l_word)
         .filter(|x| !x.is_empty())
-        .collect::<Vec<&str>>()
-        .len();
-
-    // Increment counter for regex patterns we need to subtract from our total (patterns that merge syllables)
-    sub_counter += SUB_REGEX.iter()
-        .filter(|x| x.captures(l_word).is_some())
-        .collect::<Vec<&Regex>>()
-        .len();
-
-    // Increment counter for regex matches we need to add to our counter (patterns that create syllables)
-    let add_caps: Vec<Option<regex::Captures<'_>>> = ADD_REGEX.par_iter()
-        .map(|x| x.captures(l_word))
-        .filter(|x| x.is_some())
-        .collect::<Vec<_>>();
-
-    add_counter += add_caps.len();
-
-    // Check add captures for 
-    sub_counter += add_caps.par_iter()
-        .map(
-            |x| VALID_REGEX.split(
-                    x.as_ref()
-                    .unwrap()
-                    .get(0)
-                    .unwrap()
-                    .as_str()
-            ).filter(|y| !y.is_empty()).collect::<Vec<&str>>().len()
-        ).collect::<Vec<usize>>().par_iter().sum::<usize>();
-
-    let syll_out: usize = valid_parts + add_counter - sub_counter;
-
-    if syll_out <= 0 {
-        return 1;
-    } else {
-        return syll_out;
-    }
-}
-
-// Estimates the number of syllables in a word. This is a simple heuristic that is not perfect, but should work for most English words.
-pub fn estimate_syllables_new(word: &str) -> usize {
-    if word.len() < 1 {
-        return 0;
-    }
-
-    // Initialise counters
-    let mut sub_counter: usize = 0;
-    let mut add_counter: usize = 0;
-
-    // Matches will be case-insensitive
-    let l_word: &str = &word.to_lowercase()[..];
-
-    // Split and count "valid" syllable part candidates
-    let valid_parts: usize = VALID_REGEX.split(l_word)
-        .filter(|x| !x.is_empty())
         .count();
 
     // Increment counter for regex patterns we need to subtract from our total (patterns that merge syllables)
@@ -438,31 +384,6 @@ mod tests {
     #[test]
     fn test_estimate_syllables_hyphens() {
         assert_eq!(estimate_syllables("free-for-all"), 3)
-    }
-
-    #[test]
-    fn test_estimate_syllables_new() {
-        assert_eq!(estimate_syllables_new("Apple"), 2);
-        assert_eq!(estimate_syllables_new("Tart"), 1);
-        assert_eq!(estimate_syllables_new("plate"), 1); 
-        assert_eq!(estimate_syllables_new("Pontificate"), 4);
-        assert_eq!(estimate_syllables_new("hello"), 2);
-        assert_eq!(estimate_syllables_new("elephant"), 3);
-        assert_eq!(estimate_syllables_new("programming"), 3);
-        assert_eq!(estimate_syllables_new("extravaganza"), 5);
-        assert_eq!(estimate_syllables_new("syllable"), 3);
-        assert_eq!(estimate_syllables_new("onomatopoeia"), 3);
-        assert_eq!(estimate_syllables_new("juxtaposition"), 4);
-    }
-
-    #[test]
-    fn test_estimate_syllables_blank_new() {
-        assert_eq!(estimate_syllables_new(""), 0);
-    }
-
-    #[test]
-    fn test_estimate_syllables_hyphens_new() {
-        assert_eq!(estimate_syllables_new("free-for-all"), 3)
     }
 
     #[test]
