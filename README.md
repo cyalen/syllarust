@@ -1,5 +1,5 @@
 # syllarust
-A simple syllable counter implemented natively in Rust. This is based on the work of the [python-syllables team](https://github.com/prosegrinder/python-syllables), which implents the same functionality in Python.
+A simple syllable counter implemented natively in Rust, with additional bindings for python. This is based on the work of the [python-syllables team](https://github.com/prosegrinder/python-syllables), which implements the same functionality in natively Python.
 
 My goal was to bring the same ease/simplicity to Rust - and use Rust's fearless concurrency model to help improve the speed/quality at which syllable counts can be generated. This means if you're trying to generate syllable counts for large NLP/LLM applications where speed matters, this may be the crate you're looking for!
 
@@ -27,6 +27,8 @@ fn main() {
     println!("{:?}", results);
 }
 ```
+
+While the primary goal of this repo is to contribute more blazingly fast text metrics and NLP tools to Rust, I'm also hoping to create better, faster implementations in the Python space in due course.
 
 ## Contributions/Issues
 This is currently a work-in-progress repo. If you have any feature requests/spot a bug, leave me an issue and I'll try and tackle it when I can. I'm also open to sensible PRs.
