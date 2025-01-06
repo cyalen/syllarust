@@ -4,11 +4,10 @@ version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "A simple crate for quickly counting syllables"
-repository = "https://github.com/cyalen/syllable-rs"
+repository = "https://github.com/cyalen/syllarust"
 readme = "README.md"
 authors = ["cyalen"]
 keywords = ["syllables", "NLP", "text", "language"]
-categories = ["Text processing"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
