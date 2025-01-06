@@ -46,9 +46,32 @@ For additional information, please see the documentation for the individual func
 use regex::{Regex, Matches};
 use rayon::prelude::{*};
 use std::cmp::min;
+use lazy_static::lazy_static;
+use pyo3::prelude::*;
 
-#[macro_use]
-extern crate lazy_static;
+#[pyfunction]
+fn syllable_estimate(text: String) -> PyResult<usize> {
+    Ok(estimate_syllables(&text))
+}
+
+#[pyfunction]
+fn token_count(text: String) -> PyResult<usize> {
+    Ok(count_tokens(&text))
+}
+
+#[pyfunction]
+fn sentence_count(text: String) -> PyResult<usize> {
+    Ok(count_sentences(&text))
+}
+
+/// A Python module implemented in Rust.
+#[pymodule]
+fn syllarust(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(syllable_estimate, m)?)?;
+    m.add_function(wrap_pyfunction!(token_count, m)?)?;
+    m.add_function(wrap_pyfunction!(sentence_count, m)?)?;
+    Ok(())
+}
 
 lazy_static!(
     static ref ADD_REGEX: [Regex; 123] = [
@@ -297,14 +320,12 @@ pub fn estimate_syllables(word: &str) -> usize {
     // Split and count "valid" syllable part candidates
     let valid_parts: usize = VALID_REGEX.split(l_word)
         .filter(|x| !x.is_empty())
-        .collect::<Vec<&str>>()
-        .len();
+        .count();
 
     // Increment counter for regex patterns we need to subtract from our total (patterns that merge syllables)
     sub_counter += SUB_REGEX.iter()
         .filter(|x| x.captures(l_word).is_some())
-        .collect::<Vec<&Regex>>()
-        .len();
+        .count();
 
     // Increment counter for regex matches we need to add to our counter (patterns that create syllables)
     let add_caps: Vec<Option<regex::Captures<'_>>> = ADD_REGEX.par_iter()
