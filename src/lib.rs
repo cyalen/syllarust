@@ -45,7 +45,7 @@ For additional information, please see the documentation for the individual func
 
 use regex::{Regex, Matches};
 use rayon::prelude::{*};
-use std::cmp::min;
+use std::{arch::aarch64::int32x2_t, cmp::min};
 use lazy_static::lazy_static;
 use pyo3::prelude::*;
 
@@ -234,6 +234,45 @@ lazy_static!(
 
     static ref VALID_REGEX: Regex = Regex::new(r"[^aeiouy]+").unwrap();
 );
+
+struct Doc <'a> {
+    text: &'a str,
+    length: usize,
+}
+
+struct Token<'a> {
+    doc: &'a Doc<'a>,
+    i: i32,
+    start_idx: i32,
+    end_idx: i32,
+    length: i32
+}
+
+impl Doc <'_>{
+    fn tokens(&self) -> Vec<Token> {
+        let tokens: Vec<&str> = tokens_vec(&self.text);
+        let mut struct_vec: Vec<Token> = vec![];
+        let mut i: i32 = 0;
+        let mut start_idx: i32 = 0;
+
+        for token in tokens {
+            struct_vec.push(
+                Token {
+                    doc: self,
+                    i: i,
+                    start_idx: start_idx,
+                    end_idx: start_idx + token.len() as i32,
+                    length: token.len() as i32
+                }
+            );
+
+            i += 1;
+            start_idx += token.len() as i32 + 1;
+        }
+
+        return struct_vec
+    }
+}
 
 // Counts the number of words in a text, defined as a sequence of characters separated by whitespace.
 pub fn count_words(text: &str) -> usize {
