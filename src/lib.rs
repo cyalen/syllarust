@@ -235,22 +235,36 @@ lazy_static!(
     static ref VALID_REGEX: Regex = Regex::new(r"[^aeiouy]+").unwrap();
 );
 
-struct Doc <'a> {
-    text: &'a str,
-    length: usize,
+#[derive(Debug)]
+pub struct Doc <'a> {
+    pub text: &'a str,
+    pub tokens: Vec<Token<'a>>,
+    pub length: usize,
 }
 
-struct Token<'a> {
-    doc: &'a Doc<'a>,
+#[derive(Debug)]
+pub struct Token<'a> {
+    // doc: &'a Doc<'a>,
+    pub text: &'a str,
     i: i32,
     start_idx: i32,
     end_idx: i32,
     length: i32
 }
 
-impl Doc <'_>{
-    fn tokens(&self) -> Vec<Token> {
-        let tokens: Vec<&str> = tokens_vec(&self.text);
+impl<'a> Doc <'a>{
+    pub fn new(text: &'a str) -> Self {
+        let tokens = Self::tokens(text);
+        let length = tokens.len();
+        Doc {
+            text,
+            tokens,
+            length,
+        }
+    }
+
+    pub fn tokens(text: &'a str) -> Vec<Token<'a>> {
+        let tokens: Vec<&str> = tokens_vec(text);
         let mut struct_vec: Vec<Token> = vec![];
         let mut i: i32 = 0;
         let mut start_idx: i32 = 0;
@@ -258,11 +272,11 @@ impl Doc <'_>{
         for token in tokens {
             struct_vec.push(
                 Token {
-                    doc: self,
+                    text: token,
                     i: i,
                     start_idx: start_idx,
                     end_idx: start_idx + token.len() as i32,
-                    length: token.len() as i32
+                    length: token.len() as i32,
                 }
             );
 
@@ -325,15 +339,17 @@ pub fn tokens_vec(text: &str) -> Vec<&str> {
     let words_and_punct: Vec<&str> = text.split_whitespace().collect();
     let mut tokens: Vec<&str>  = vec![];
 
-    let r: Regex  =  Regex::new(r"[-.,!?;:]").unwrap();
+    let r: Regex  =  Regex::new(r"[-.,!?;:]+").unwrap();
     for word in words_and_punct {
         let punct_span = r.find(word);
 
         if punct_span.is_none() {
             tokens.push(word);
         } else {
+            // Need to push leading non-punct chars if necessary
             tokens.push(&word[..punct_span.unwrap().range().start]);
-            tokens.push(&word[punct_span.unwrap().range().start..punct_span.unwrap().range().end]);
+            // Need to push split punct chars 
+            tokens.extend(split_punct_chars(&word[punct_span.unwrap().range().start..punct_span.unwrap().range().end]));
             tokens.push(&word[punct_span.unwrap().range().end..]);
         }
     }
@@ -341,6 +357,14 @@ pub fn tokens_vec(text: &str) -> Vec<&str> {
     let result: Vec<&str> = tokens.into_iter().filter(|x| *x != "" && *x != " ").collect::<Vec<&str>>();
 
     return result;
+}
+
+fn split_punct_chars(text: &str) -> Vec<&str> {
+    let mut chars_vec: Vec<&str> = Vec::new();
+    for (idx, text_char) in text.chars().into_iter().enumerate() {
+        chars_vec.push(&text[idx..idx + text_char.len_utf8()]);
+    }
+    return chars_vec
 }
 
 // Estimates the number of syllables in a word. This is a simple heuristic that is not perfect, but should work for most English words.
