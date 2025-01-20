@@ -50,7 +50,7 @@ use lazy_static::lazy_static;
 use pyo3::prelude::*;
 
 #[pyfunction]
-fn syllable_estimate(text: String) -> PyResult<usize> {
+fn syllable_estimate(text: String) -> PyResult<i32> {
     Ok(estimate_syllables(&text))
 }
 
@@ -240,6 +240,7 @@ pub struct Doc <'a> {
     pub text: &'a str,
     pub tokens: Vec<Token<'a>>,
     pub length: usize,
+    pub syllables: i32,
 }
 
 #[derive(Debug)]
@@ -249,17 +250,21 @@ pub struct Token<'a> {
     i: i32,
     start_idx: i32,
     end_idx: i32,
-    length: i32
+    length: i32,
+    syllables: i32
 }
 
 impl<'a> Doc <'a>{
     pub fn new(text: &'a str) -> Self {
         let tokens = Self::tokens(text);
         let length = tokens.len();
-        Doc {
+        let syllables = tokens.iter().map(|x| x.syllables).sum();
+        
+        return Doc {
             text,
             tokens,
             length,
+            syllables
         }
     }
 
@@ -277,6 +282,7 @@ impl<'a> Doc <'a>{
                     start_idx: start_idx,
                     end_idx: start_idx + token.len() as i32,
                     length: token.len() as i32,
+                    syllables: estimate_syllables(token)
                 }
             );
 
@@ -368,27 +374,27 @@ fn split_punct_chars(text: &str) -> Vec<&str> {
 }
 
 // Estimates the number of syllables in a word. This is a simple heuristic that is not perfect, but should work for most English words.
-pub fn estimate_syllables(word: &str) -> usize {
+pub fn estimate_syllables(word: &str) -> i32 {
     if word.len() < 1 {
         return 0;
     }
 
     // Initialise counters
-    let mut sub_counter: usize = 0;
-    let mut add_counter: usize = 0;
+    let mut sub_counter: i32 = 0;
+    let mut add_counter: i32 = 0;
 
     // Matches will be case-insensitive
     let l_word: &str = &word.to_lowercase()[..];
 
     // Split and count "valid" syllable part candidates
-    let valid_parts: usize = VALID_REGEX.split(l_word)
+    let valid_parts: i32 = VALID_REGEX.split(l_word)
         .filter(|x| !x.is_empty())
-        .count();
+        .count() as i32;
 
     // Increment counter for regex patterns we need to subtract from our total (patterns that merge syllables)
     sub_counter += SUB_REGEX.iter()
         .filter(|x| x.captures(l_word).is_some())
-        .count();
+        .count() as i32;
 
     // Increment counter for regex matches we need to add to our counter (patterns that create syllables)
     let add_caps: Vec<Option<regex::Captures<'_>>> = ADD_REGEX.par_iter()
@@ -396,7 +402,7 @@ pub fn estimate_syllables(word: &str) -> usize {
         .filter(|x| x.is_some())
         .collect::<Vec<_>>();
 
-    add_counter += add_caps.len();
+    add_counter += add_caps.len() as i32;
 
     // Check add captures for 
     sub_counter += add_caps.par_iter()
@@ -407,10 +413,10 @@ pub fn estimate_syllables(word: &str) -> usize {
                     .get(0)
                     .unwrap()
                     .as_str()
-            ).filter(|y| !y.is_empty()).collect::<Vec<&str>>().len()
-        ).collect::<Vec<usize>>().par_iter().sum::<usize>();
+            ).filter(|y| !y.is_empty()).collect::<Vec<&str>>().len() as i32
+        ).collect::<Vec<i32>>().par_iter().sum::<i32>();
 
-    let syll_out: usize = valid_parts + add_counter - sub_counter;
+    let syll_out  = valid_parts + add_counter - sub_counter;
 
     if syll_out <= 0 {
         return 1;
