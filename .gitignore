@@ -3,7 +3,6 @@
 *.ipynb
 *.vscode
 *.pytest_cache
-*.lock
 
 # Ignore local test data/files
 *.json
