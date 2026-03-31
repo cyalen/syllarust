@@ -3,9 +3,10 @@ This is still a work in progress, but the goal is to provide a simple library fo
 
 The example below uses the `rayon` crate for parallel processing, but this is not necessary for the library to work. The library is designed to take advantage of Rust's fearless concucrrency features, but use it how you'd like!
 
-```rust
+```rust,no_run
 use syllarust::estimate_syllables;
 use rayon::prelude::*;
+use std::time::Instant;
 
 fn main() {
     let test_strs: Vec<&str> = vec![
@@ -15,7 +16,7 @@ fn main() {
         "Pontificate",
         "Hello"
     ];
-    
+
     let start = Instant::now();
     let results: Vec<usize> = test_strs.par_iter()
         .map(|s| estimate_syllables(s))
@@ -43,28 +44,36 @@ fn main() {
 For additional information, please see the documentation for the individual functions themselves.
 */
 
-use regex::{Regex, Matches};
-use rayon::prelude::{*};
-use std::cmp::min;
+mod syllables;
 use lazy_static::lazy_static;
+use rayon::prelude::*;
+use regex::{Matches, Regex};
+use std::cmp::min;
+
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn syllable_estimate(text: String) -> PyResult<usize> {
+    #[allow(deprecated)]
     Ok(estimate_syllables(&text))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn token_count(text: String) -> PyResult<usize> {
     Ok(count_tokens(&text))
 }
 
+#[cfg(feature = "python")]
 #[pyfunction]
 fn sentence_count(text: String) -> PyResult<usize> {
     Ok(count_sentences(&text))
 }
 
 /// A Python module implemented in Rust.
+#[cfg(feature = "python")]
 #[pymodule]
 fn syllarust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(syllable_estimate, m)?)?;
@@ -73,7 +82,7 @@ fn syllarust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-lazy_static!(
+lazy_static! {
     static ref ADD_REGEX: [Regex; 123] = [
         Regex::new("cial").unwrap(),
         Regex::new("tia").unwrap(),
@@ -199,7 +208,6 @@ lazy_static!(
         Regex::new(".ves$").unwrap(),
         Regex::new("ere$").unwrap()
     ];
-    
     static ref SUB_REGEX: [Regex; 29] = [
         Regex::new("riet").unwrap(),
         Regex::new("dien").unwrap(),
@@ -231,13 +239,12 @@ lazy_static!(
         Regex::new("dnt$").unwrap(),
         Regex::new("ia").unwrap(),
     ];
-
     static ref VALID_REGEX: Regex = Regex::new(r"[^aeiouy]+").unwrap();
-);
+}
 
 // Counts the number of words in a text, defined as a sequence of characters separated by whitespace.
 pub fn count_words(text: &str) -> usize {
-    return text.split_whitespace().count()
+    return text.split_whitespace().count();
 }
 
 // Counts the number of sentences in a text, defined as a sequence of characters ending in a period, exclamation point, question mark or line break.
@@ -269,7 +276,10 @@ pub fn sentence_vec(text: &str) -> Vec<&str> {
             offset = min(t.end(), text.len());
         }
     }
-    result = result.into_iter().filter(|x| !x.chars().all(|y| y  == ' ')).collect::<Vec<&str>>();
+    result = result
+        .into_iter()
+        .filter(|x| !x.chars().all(|y| y == ' '))
+        .collect::<Vec<&str>>();
 
     return result;
 }
@@ -284,9 +294,9 @@ pub fn count_tokens(text: &str) -> usize {
 // Punctuation is included as a separate token.
 pub fn tokens_vec(text: &str) -> Vec<&str> {
     let words_and_punct: Vec<&str> = text.split_whitespace().collect();
-    let mut tokens: Vec<&str>  = vec![];
+    let mut tokens: Vec<&str> = vec![];
 
-    let r: Regex  =  Regex::new(r"[-.,!?;:]").unwrap();
+    let r: Regex = Regex::new(r"[-.,!?;:]").unwrap();
     for word in words_and_punct {
         let punct_span = r.find(word);
 
@@ -299,7 +309,10 @@ pub fn tokens_vec(text: &str) -> Vec<&str> {
         }
     }
 
-    let result: Vec<&str> = tokens.into_iter().filter(|x| *x != "" && *x != " ").collect::<Vec<&str>>();
+    let result: Vec<&str> = tokens
+        .into_iter()
+        .filter(|x| *x != "" && *x != " ")
+        .collect::<Vec<&str>>();
 
     return result;
 }
@@ -318,34 +331,36 @@ pub fn estimate_syllables(word: &str) -> usize {
     let l_word: &str = &word.to_lowercase()[..];
 
     // Split and count "valid" syllable part candidates
-    let valid_parts: usize = VALID_REGEX.split(l_word)
-        .filter(|x| !x.is_empty())
-        .count();
+    let valid_parts: usize = VALID_REGEX.split(l_word).filter(|x| !x.is_empty()).count();
 
     // Increment counter for regex patterns we need to subtract from our total (patterns that merge syllables)
-    sub_counter += SUB_REGEX.iter()
+    sub_counter += SUB_REGEX
+        .iter()
         .filter(|x| x.captures(l_word).is_some())
         .count();
 
     // Increment counter for regex matches we need to add to our counter (patterns that create syllables)
-    let add_caps: Vec<Option<regex::Captures<'_>>> = ADD_REGEX.par_iter()
+    let add_caps: Vec<Option<regex::Captures<'_>>> = ADD_REGEX
+        .par_iter()
         .map(|x| x.captures(l_word))
         .filter(|x| x.is_some())
         .collect::<Vec<_>>();
 
     add_counter += add_caps.len();
 
-    // Check add captures for 
-    sub_counter += add_caps.par_iter()
-        .map(
-            |x| VALID_REGEX.split(
-                    x.as_ref()
-                    .unwrap()
-                    .get(0)
-                    .unwrap()
-                    .as_str()
-            ).filter(|y| !y.is_empty()).collect::<Vec<&str>>().len()
-        ).collect::<Vec<usize>>().par_iter().sum::<usize>();
+    // Check add captures for
+    sub_counter += add_caps
+        .par_iter()
+        .map(|x| {
+            VALID_REGEX
+                .split(x.as_ref().unwrap().get(0).unwrap().as_str())
+                .filter(|y| !y.is_empty())
+                .collect::<Vec<&str>>()
+                .len()
+        })
+        .collect::<Vec<usize>>()
+        .par_iter()
+        .sum::<usize>();
 
     let syll_out: usize = valid_parts + add_counter - sub_counter;
 
@@ -365,7 +380,7 @@ mod tests {
     fn test_estimate_syllables() {
         assert_eq!(estimate_syllables("Apple"), 2);
         assert_eq!(estimate_syllables("Tart"), 1);
-        assert_eq!(estimate_syllables("plate"), 1); 
+        assert_eq!(estimate_syllables("plate"), 1);
         assert_eq!(estimate_syllables("Pontificate"), 4);
         assert_eq!(estimate_syllables("hello"), 2);
         assert_eq!(estimate_syllables("elephant"), 3);
@@ -408,8 +423,14 @@ mod tests {
     #[test]
     fn test_sentence_vec() {
         assert_eq!(sentence_vec("Hello, world!"), vec!["Hello, world!"]);
-        assert_eq!(sentence_vec("Hello, world! This is a test.  \n"), vec![ "Hello, world!", "This is a test."]);
-        assert_eq!(sentence_vec("Hello, world!\nThis can't be a test.  \n"), vec![ "Hello, world!", "This can't be a test."]);
+        assert_eq!(
+            sentence_vec("Hello, world! This is a test.  \n"),
+            vec!["Hello, world!", "This is a test."]
+        );
+        assert_eq!(
+            sentence_vec("Hello, world!\nThis can't be a test.  \n"),
+            vec!["Hello, world!", "This can't be a test."]
+        );
     }
 
     #[test]
@@ -418,6 +439,9 @@ mod tests {
         assert_eq!(count_sentences("Hello, world! This is a test."), 2);
         assert_eq!(count_sentences("Hello, world! This is a test.  "), 2);
         assert_eq!(count_sentences("Hello, world! This is a test.  \n"), 2);
-        assert_eq!(count_sentences("Hello, world!\nThis can't be a test.  \n"), 2);
+        assert_eq!(
+            count_sentences("Hello, world!\nThis can't be a test.  \n"),
+            2
+        );
     }
- }
+}
