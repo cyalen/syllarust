@@ -23,8 +23,8 @@ WORDS_COMPLEX = [
 ]
 ALL_WORDS = WORDS_SIMPLE + WORDS_MEDIUM + WORDS_COMPLEX
 
-ITERATIONS = 50_000
-ROUNDS = 5
+ITERATIONS = 10_000
+ROUNDS = 3
 
 
 def benchmark(fn, words, iterations, label):
