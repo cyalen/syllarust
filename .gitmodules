@@ -1,3 +1,0 @@
-[submodule "cmudict"]
-	path = cmudict
-	url = git@github.com:cyalen/cmudict.git
