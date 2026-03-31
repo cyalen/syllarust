@@ -4,11 +4,11 @@
 //! heuristic. Accuracy is approximately 75% against the CMU Pronouncing Dictionary.
 //! Used as the fallback for words not found in the CMU dict.
 
-use lazy_static::lazy_static;
 use regex::Regex;
+use std::sync::LazyLock;
 
-lazy_static! {
-    static ref ADD_REGEX: [Regex; 123] = [
+static ADD_REGEX: LazyLock<[Regex; 123]> = LazyLock::new(|| {
+    [
         Regex::new("cial").unwrap(),
         Regex::new("tia").unwrap(),
         Regex::new("cius").unwrap(),
@@ -132,8 +132,11 @@ lazy_static! {
         Regex::new(".res$").unwrap(),
         Regex::new(".ves$").unwrap(),
         Regex::new("ere$").unwrap(),
-    ];
-    static ref SUB_REGEX: [Regex; 29] = [
+    ]
+});
+
+static SUB_REGEX: LazyLock<[Regex; 29]> = LazyLock::new(|| {
+    [
         Regex::new("riet").unwrap(),
         Regex::new("dien").unwrap(),
         Regex::new("ien").unwrap(),
@@ -163,9 +166,10 @@ lazy_static! {
         Regex::new("[^gq]ua[^auieo]").unwrap(),
         Regex::new("dnt$").unwrap(),
         Regex::new("ia").unwrap(),
-    ];
-    static ref VALID_REGEX: Regex = Regex::new(r"[^aeiouy]+").unwrap();
-}
+    ]
+});
+
+static VALID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^aeiouy]+").unwrap());
 
 /// Estimates syllable count using a regex heuristic.
 ///

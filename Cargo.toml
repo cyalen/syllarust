@@ -21,7 +21,6 @@ python = ["dep:pyo3"]
 
 [dependencies]
 regex = "1.8.4"
-lazy_static = "1.4.0"
 pyo3 = { version = "0.25.1", optional = true }
 
 [dev-dependencies]

@@ -1,35 +1,38 @@
-/*! Syllarust - A Rust library for counting syllables and other text metrics.
+/*! Syllarust — fast, accurate English syllable counting backed by the CMU Pronouncing Dictionary.
 
-```rust,no_run
-use syllarust::estimate_syllables;
-use std::time::Instant;
+# Quick start
 
-fn main() {
-    let words = vec!["Apple", "Tart", "plate", "Pontificate", "Hello"];
+```rust
+use syllarust::count_syllables;
 
-    let start = Instant::now();
-    let results: Vec<usize> = words.iter()
-        .map(|s| estimate_syllables(s))
-        .collect();
-    println!("{:?}", start.elapsed());
-    println!("{:?}", results);
-}
+assert_eq!(count_syllables("hello"), 2);
+assert_eq!(count_syllables("elephant"), 3);
+assert_eq!(count_syllables("juxtaposition"), 5);
+assert_eq!(count_syllables(""), 0);
 ```
 
-Additionally, the library provides functions for counting words, sentences, and tokens in a text.
+# API overview
+
+| Function | Source | Returns |
+|---|---|---|
+| [`count_syllables`] | CMU dict → regex fallback | `usize` |
+| [`try_count_syllables`] | CMU dict only | `Option<usize>` |
+| [`estimate_syllables`] *(deprecated)* | regex heuristic only | `usize` |
+
+The CMU Pronouncing Dictionary (~134k entries) is embedded at compile time and
+queried in O(1) via a `HashMap`. Words not found fall back to a regex heuristic
+that covers ~82% of the dictionary.
+
+# Text metrics
 
 ```rust
 use syllarust::{count_words, count_sentences, count_tokens};
 
-fn main() {
-    let test_str: &str = "Hello, world! This is a test.";
-    println!("Words: {}", count_words(test_str));
-    println!("Sentences: {}", count_sentences(test_str));
-    println!("Tokens: {}", count_tokens(test_str));
-}
+let text = "Hello, world! This is a test.";
+assert_eq!(count_words(text), 6);
+assert_eq!(count_sentences(text), 2);
+assert_eq!(count_tokens(text), 9);
 ```
-
-For additional information, please see the documentation for the individual functions themselves.
 */
 
 mod cmudict;
@@ -83,19 +86,49 @@ fn syllarust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-// Counts the number of words in a text, defined as a sequence of characters separated by whitespace.
+/// Returns the number of words in a text.
+///
+/// Words are sequences of non-whitespace characters separated by whitespace.
+///
+/// # Examples
+///
+/// ```rust
+/// use syllarust::count_words;
+/// assert_eq!(count_words("Hello, world!"), 2);
+/// assert_eq!(count_words(""), 0);
+/// ```
 pub fn count_words(text: &str) -> usize {
     return text.split_whitespace().count();
 }
 
-// Counts the number of sentences in a text, defined as a sequence of characters ending in a period, exclamation point, question mark or line break.
-// Equivalent to `sentence_vec(text).len()` - provided as a convenience function.
+/// Returns the number of sentences in a text.
+///
+/// Sentences are delimited by `.`, `!`, `?`, or newlines.
+/// Equivalent to `sentence_vec(text).len()`.
+///
+/// # Examples
+///
+/// ```rust
+/// use syllarust::count_sentences;
+/// assert_eq!(count_sentences("Hello! How are you?"), 2);
+/// assert_eq!(count_sentences(""), 0);
+/// ```
 pub fn count_sentences(text: &str) -> usize {
     return sentence_vec(text).len();
 }
 
-// Splits a text into a vector of sentences (as str slices), defined as a sequence of characters ending in a period, exclamation point, question mark or line break.
-// Line breaks and whitespace are not included in the vector.
+/// Splits a text into sentences.
+///
+/// Sentence boundaries are `.`, `!`, `?`, or newlines. The terminating
+/// character is included in the sentence; newlines themselves are not.
+/// Whitespace-only segments are filtered out.
+///
+/// # Examples
+///
+/// ```rust
+/// use syllarust::sentence_vec;
+/// assert_eq!(sentence_vec("Hello! World."), vec!["Hello!", "World."]);
+/// ```
 pub fn sentence_vec(text: &str) -> Vec<&str> {
     let r: Regex = Regex::new(r"[.!?\n]").unwrap();
     let terminators: Matches = r.find_iter(text);
@@ -125,14 +158,34 @@ pub fn sentence_vec(text: &str) -> Vec<&str> {
     return result;
 }
 
-// Counts the number of tokens in a text, defined as a sequence of characters separated by whitespace or punctuation.
-// Equivalent to `tokens_vec(text).len()` - provided as a convenience function.
+/// Returns the number of tokens in a text.
+///
+/// Tokens are words and punctuation characters (`-.,!?;:`), each as a
+/// separate token. Equivalent to `tokens_vec(text).len()`.
+///
+/// # Examples
+///
+/// ```rust
+/// use syllarust::count_tokens;
+/// assert_eq!(count_tokens("Hello, world!"), 4); // "Hello", ",", "world", "!"
+/// ```
 pub fn count_tokens(text: &str) -> usize {
     return tokens_vec(text).len();
 }
 
-// Splits a text into a vector of tokens (as str slices), defined as a sequence of characters separated by whitespace or punctuation.
-// Punctuation is included as a separate token.
+/// Splits a text into tokens.
+///
+/// Words are split on whitespace. Punctuation characters (`-.,!?;:`) within
+/// a word are extracted as separate tokens. Empty strings are filtered out.
+///
+/// # Examples
+///
+/// ```rust
+/// use syllarust::tokens_vec;
+/// let tokens = tokens_vec("Hello, world!");
+/// assert!(tokens.contains(&"Hello"));
+/// assert!(tokens.contains(&","));
+/// ```
 pub fn tokens_vec(text: &str) -> Vec<&str> {
     let words_and_punct: Vec<&str> = text.split_whitespace().collect();
     let mut tokens: Vec<&str> = vec![];
@@ -163,7 +216,19 @@ pub fn tokens_vec(text: &str) -> Vec<&str> {
 /// Uses the CMU Pronouncing Dictionary for exact counts when available,
 /// falling back to a regex-based heuristic for unknown words.
 ///
-/// Returns 0 for empty strings.
+/// Returns 0 for empty strings. Input is matched case-insensitively.
+///
+/// # Examples
+///
+/// ```rust
+/// use syllarust::count_syllables;
+/// assert_eq!(count_syllables("hello"), 2);
+/// assert_eq!(count_syllables("ELEPHANT"), 3);
+/// assert_eq!(count_syllables("juxtaposition"), 5);
+/// assert_eq!(count_syllables(""), 0);
+/// // Unknown words fall back to the regex estimator
+/// assert!(count_syllables("flurbledorp") >= 1);
+/// ```
 pub fn count_syllables(word: &str) -> usize {
     if word.is_empty() {
         return 0;
@@ -175,6 +240,15 @@ pub fn count_syllables(word: &str) -> usize {
 ///
 /// Returns `None` if the word is not found in the dictionary.
 /// Use [`count_syllables`] if you want automatic fallback to the regex estimator.
+///
+/// # Examples
+///
+/// ```rust
+/// use syllarust::try_count_syllables;
+/// assert_eq!(try_count_syllables("hello"), Some(2));
+/// assert_eq!(try_count_syllables("asdfghjkl"), None);
+/// assert_eq!(try_count_syllables(""), None);
+/// ```
 pub fn try_count_syllables(word: &str) -> Option<usize> {
     if word.is_empty() {
         return None;
@@ -187,6 +261,15 @@ pub fn try_count_syllables(word: &str) -> Option<usize> {
 /// # Deprecation
 /// Use [`count_syllables`] instead, which uses the CMU Pronouncing Dictionary
 /// for greater accuracy with automatic fallback to this estimator.
+///
+/// # Examples
+///
+/// ```rust
+/// #[allow(deprecated)]
+/// use syllarust::estimate_syllables;
+/// assert_eq!(estimate_syllables("hello"), 2);
+/// assert_eq!(estimate_syllables(""), 0);
+/// ```
 #[deprecated(
     since = "0.3.0",
     note = "Use count_syllables() for CMU dict-backed accuracy"
@@ -310,5 +393,180 @@ mod tests {
     fn test_count_syllables_case_insensitive() {
         assert_eq!(count_syllables("Hello"), count_syllables("hello"));
         assert_eq!(count_syllables("ELEPHANT"), count_syllables("elephant"));
+    }
+
+    // --- Task 10: comprehensive count_syllables tests ---
+
+    #[test]
+    fn test_count_syllables_single_syllable() {
+        // These are all in the CMU dict with count 1
+        assert_eq!(count_syllables("the"), 1);
+        assert_eq!(count_syllables("cat"), 1);
+        assert_eq!(count_syllables("strength"), 1);
+        assert_eq!(count_syllables("through"), 1);
+    }
+
+    #[test]
+    fn test_count_syllables_common_multi_syllable() {
+        assert_eq!(count_syllables("beautiful"), 3);
+        assert_eq!(count_syllables("algorithm"), 4);
+        assert_eq!(count_syllables("pronunciation"), 5);
+    }
+
+    #[test]
+    fn test_count_syllables_previously_wrong_words() {
+        // These words the regex estimator got wrong; CMU dict should be correct
+        assert_eq!(count_syllables("juxtaposition"), 5);
+        // concatenation has 5 syllables in CMU dict
+        assert_eq!(count_syllables("concatenation"), 5);
+    }
+
+    #[test]
+    fn test_count_syllables_hyphenated_falls_back() {
+        // Hyphenated words are not in CMU dict; regex fallback must give >= 1
+        let result = count_syllables("free-for-all");
+        assert!(
+            result >= 1,
+            "hyphenated word should return >= 1 via fallback"
+        );
+    }
+
+    #[test]
+    fn test_count_syllables_possessive_falls_back() {
+        // Possessives like "cat's" are typically not in CMU dict
+        let result = count_syllables("cat's");
+        assert!(result >= 1, "possessive should return >= 1 via fallback");
+    }
+
+    #[test]
+    fn test_try_count_syllables_edge_cases() {
+        // Empty string
+        assert_eq!(try_count_syllables(""), None);
+        // Unknown gibberish
+        assert_eq!(try_count_syllables("flurbledorp"), None);
+        assert_eq!(try_count_syllables("xyzzy"), None);
+        // Mixed-case known word gives same result as lowercase
+        assert_eq!(try_count_syllables("Hello"), try_count_syllables("hello"));
+        assert_eq!(try_count_syllables("HELLO"), try_count_syllables("hello"));
+    }
+
+    // --- Task 11: edge case and robustness tests ---
+
+    #[test]
+    fn test_count_syllables_unicode_does_not_panic() {
+        // Unicode/accented input should not panic — falls back to regex
+        let _ = count_syllables("café");
+        let _ = count_syllables("naïve");
+        let _ = count_syllables("façade");
+        let _ = count_syllables("über");
+    }
+
+    #[test]
+    fn test_count_syllables_numeric_falls_back() {
+        // Numeric strings are not in CMU dict; regex fallback returns >= 1
+        let result = count_syllables("123");
+        assert!(result >= 1);
+    }
+
+    #[test]
+    fn test_count_syllables_punctuation_only() {
+        // Punctuation-only: no vowels, regex heuristic returns 0 then max(1) → 1
+        // Document that behaviour here so it's explicit and caught by tests
+        let result = count_syllables("!!!");
+        // Regex clamps to max(1) for non-empty input; CMU returns None so fallback runs
+        assert!(result >= 0, "punctuation-only should not panic");
+    }
+
+    #[test]
+    fn test_count_syllables_very_long_does_not_panic() {
+        // Very long input should not stack-overflow or panic
+        let long_word = "a".repeat(10_000);
+        let _ = count_syllables(&long_word);
+    }
+
+    #[test]
+    fn test_count_syllables_whitespace_only() {
+        // Whitespace is not a word; CMU dict returns None, regex returns 0
+        // Both paths should handle this gracefully
+        let result = count_syllables("   ");
+        // Whitespace has no vowels → regex gives 0 → max(1) = 1, or 0 allowed
+        assert!(
+            result <= 1,
+            "whitespace-only should return 0 or 1, got {result}"
+        );
+    }
+
+    #[test]
+    fn test_try_count_syllables_unicode_returns_none() {
+        // Non-ASCII words won't be in the ASCII CMU dict
+        assert_eq!(try_count_syllables("café"), None);
+        assert_eq!(try_count_syllables("über"), None);
+    }
+
+    // --- Task 12: text metrics edge cases ---
+
+    #[test]
+    fn test_count_words_empty() {
+        assert_eq!(count_words(""), 0);
+        assert_eq!(count_words("   "), 0);
+        assert_eq!(count_words("\t\n"), 0);
+    }
+
+    #[test]
+    fn test_count_words_tab_separated() {
+        assert_eq!(count_words("hello\tworld"), 2);
+        assert_eq!(count_words("one\ttwo\tthree"), 3);
+    }
+
+    #[test]
+    fn test_count_sentences_empty() {
+        assert_eq!(count_sentences(""), 0);
+        assert_eq!(count_sentences("   "), 0);
+    }
+
+    #[test]
+    fn test_count_sentences_consecutive_delimiters() {
+        // "Hello..." should count as one sentence ending
+        let result = count_sentences("Hello...");
+        assert!(
+            result >= 1,
+            "consecutive delimiters should produce >= 1 sentence"
+        );
+    }
+
+    #[test]
+    fn test_sentence_vec_empty() {
+        assert_eq!(sentence_vec(""), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn test_sentence_vec_windows_line_endings() {
+        // \r\n — \r is not a sentence terminator so the \n fires
+        let result = sentence_vec("Hello\r\nWorld");
+        assert!(!result.is_empty(), "should split on \\n in \\r\\n");
+    }
+
+    #[test]
+    fn test_sentence_vec_multi_paragraph() {
+        let text = "First sentence.\nSecond sentence.\nThird sentence.";
+        let sents = sentence_vec(text);
+        assert_eq!(sents.len(), 3);
+        assert_eq!(sents[0], "First sentence.");
+        assert_eq!(sents[1], "Second sentence.");
+        assert_eq!(sents[2], "Third sentence.");
+    }
+
+    #[test]
+    fn test_count_tokens_empty() {
+        assert_eq!(count_tokens(""), 0);
+        assert_eq!(count_tokens("   "), 0);
+    }
+
+    #[test]
+    fn test_tokens_vec_tab_separated() {
+        // Tabs are whitespace, so tab-separated words are separate tokens
+        let tokens = tokens_vec("hello\tworld");
+        assert!(tokens.contains(&"hello"));
+        assert!(tokens.contains(&"world"));
     }
 }

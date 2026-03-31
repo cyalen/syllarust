@@ -64,7 +64,7 @@ def main():
         return
 
     print("=" * 60)
-    print("Python syllables vs Rust syllarust — baseline benchmark")
+    print("Python syllables vs Rust syllarust — benchmark")
     print("=" * 60)
 
     for word_set, name in [
@@ -75,21 +75,32 @@ def main():
     ]:
         print(f"\n--- {name} words ({len(word_set)} words) ---")
         py_time, calls = benchmark(py_syl.estimate, word_set, ITERATIONS, "Python  syllables.estimate")
-        rs_time, _ = benchmark(rs_syl.syllable_estimate, word_set, ITERATIONS, "Rust    syllarust.syllable_estimate (regex)")
-        print(f"  Speedup: {py_time / rs_time:.1f}x")
+        rs_regex_time, _ = benchmark(rs_syl.syllable_estimate, word_set, ITERATIONS, "Rust    syllarust.syllable_estimate (regex, deprecated)")
+        rs_cmu_time, _ = benchmark(rs_syl.syllable_count, word_set, ITERATIONS, "Rust    syllarust.syllable_count   (CMU dict + fallback)")
+        rs_try_time, _ = benchmark(rs_syl.try_syllable_count, word_set, ITERATIONS, "Rust    syllarust.try_syllable_count (CMU dict only)")
+        print(f"  Speedup vs regex:   {py_time / rs_regex_time:.1f}x")
+        print(f"  Speedup vs CMU:     {py_time / rs_cmu_time:.1f}x")
 
     print("\n" + "=" * 60)
-    print("Per-word accuracy comparison (Python estimate vs Rust regex)")
+    print("Per-word accuracy comparison")
     print("=" * 60)
-    differs = 0
+    print(f"  {'word':<45s} {'Python':>6}  {'Rust regex':>10}  {'Rust CMU':>8}")
+    print(f"  {'-'*45} {'------':>6}  {'----------':>10}  {'--------':>8}")
+    regex_differs = 0
+    cmu_differs = 0
     for w in ALL_WORDS:
         py_count = py_syl.estimate(w)
-        rs_count = rs_syl.syllable_estimate(w)
-        marker = " <-- DIFFER" if py_count != rs_count else ""
-        if py_count != rs_count:
-            differs += 1
-        print(f"  {w:<45s} Python={py_count}  Rust={rs_count}{marker}")
-    print(f"\n  {differs}/{len(ALL_WORDS)} words differ between Python and Rust regex estimators")
+        rs_regex = rs_syl.syllable_estimate(w)
+        rs_cmu = rs_syl.syllable_count(w)
+        regex_marker = " <diff" if py_count != rs_regex else ""
+        cmu_marker = " <diff" if py_count != rs_cmu else ""
+        if py_count != rs_regex:
+            regex_differs += 1
+        if py_count != rs_cmu:
+            cmu_differs += 1
+        print(f"  {w:<45s} {py_count:>6}  {rs_regex:>10}{regex_marker:<6}  {rs_cmu:>8}{cmu_marker}")
+    print(f"\n  Regex differs from Python: {regex_differs}/{len(ALL_WORDS)}")
+    print(f"  CMU   differs from Python: {cmu_differs}/{len(ALL_WORDS)}")
 
 
 if __name__ == "__main__":
