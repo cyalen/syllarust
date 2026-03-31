@@ -210,7 +210,7 @@ pub(crate) fn estimate(word: &str) -> usize {
         })
         .sum::<usize>();
 
-    let syll_out = valid_parts + add_counter - sub_counter;
+    let syll_out = (valid_parts + add_counter).saturating_sub(sub_counter);
 
     syll_out.max(1)
 }

@@ -32,6 +32,7 @@ fn main() {
 For additional information, please see the documentation for the individual functions themselves.
 */
 
+mod cmudict;
 mod estimate;
 use regex::{Matches, Regex};
 use std::cmp::min;
@@ -44,6 +45,18 @@ use pyo3::prelude::*;
 fn syllable_estimate(text: String) -> PyResult<usize> {
     #[allow(deprecated)]
     Ok(estimate_syllables(&text))
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn syllable_count(text: String) -> PyResult<usize> {
+    Ok(count_syllables(&text))
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn try_syllable_count(text: String) -> PyResult<Option<usize>> {
+    Ok(try_count_syllables(&text))
 }
 
 #[cfg(feature = "python")]
@@ -63,6 +76,8 @@ fn sentence_count(text: String) -> PyResult<usize> {
 #[pymodule]
 fn syllarust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(syllable_estimate, m)?)?;
+    m.add_function(wrap_pyfunction!(syllable_count, m)?)?;
+    m.add_function(wrap_pyfunction!(try_syllable_count, m)?)?;
     m.add_function(wrap_pyfunction!(token_count, m)?)?;
     m.add_function(wrap_pyfunction!(sentence_count, m)?)?;
     Ok(())
@@ -143,7 +158,39 @@ pub fn tokens_vec(text: &str) -> Vec<&str> {
     return result;
 }
 
-// Estimates the number of syllables in a word. This is a simple heuristic that is not perfect, but should work for most English words.
+/// Returns the syllable count for an English word.
+///
+/// Uses the CMU Pronouncing Dictionary for exact counts when available,
+/// falling back to a regex-based heuristic for unknown words.
+///
+/// Returns 0 for empty strings.
+pub fn count_syllables(word: &str) -> usize {
+    if word.is_empty() {
+        return 0;
+    }
+    cmudict::lookup(word).unwrap_or_else(|| estimate::estimate(word))
+}
+
+/// Attempts to look up the exact syllable count from the CMU Pronouncing Dictionary.
+///
+/// Returns `None` if the word is not found in the dictionary.
+/// Use [`count_syllables`] if you want automatic fallback to the regex estimator.
+pub fn try_count_syllables(word: &str) -> Option<usize> {
+    if word.is_empty() {
+        return None;
+    }
+    cmudict::lookup(word)
+}
+
+/// Estimates the number of syllables using a regex-based heuristic.
+///
+/// # Deprecation
+/// Use [`count_syllables`] instead, which uses the CMU Pronouncing Dictionary
+/// for greater accuracy with automatic fallback to this estimator.
+#[deprecated(
+    since = "0.3.0",
+    note = "Use count_syllables() for CMU dict-backed accuracy"
+)]
 pub fn estimate_syllables(word: &str) -> usize {
     estimate::estimate(word)
 }
@@ -153,6 +200,7 @@ mod tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
 
+    #[allow(deprecated)]
     #[test]
     fn test_estimate_syllables() {
         assert_eq!(estimate_syllables("Apple"), 2);
@@ -168,11 +216,13 @@ mod tests {
         assert_eq!(estimate_syllables("juxtaposition"), 4);
     }
 
+    #[allow(deprecated)]
     #[test]
     fn test_estimate_syllables_blank() {
         assert_eq!(estimate_syllables(""), 0);
     }
 
+    #[allow(deprecated)]
     #[test]
     fn test_estimate_syllables_hyphens() {
         assert_eq!(estimate_syllables("free-for-all"), 3)
@@ -220,5 +270,45 @@ mod tests {
             count_sentences("Hello, world!\nThis can't be a test.  \n"),
             2
         );
+    }
+
+    // --- Task 6: tiered API tests ---
+
+    #[test]
+    fn test_count_syllables_known_words() {
+        assert_eq!(count_syllables("hello"), 2);
+        assert_eq!(count_syllables("elephant"), 3);
+        // juxtaposition is in CMU dict with 5 syllables
+        assert_eq!(count_syllables("juxtaposition"), 5);
+        // onomatopoeia is NOT in CMU dict; falls back to regex estimator
+        let onomatopoeia = count_syllables("onomatopoeia");
+        assert!(onomatopoeia >= 1, "should return at least 1 via fallback");
+    }
+
+    #[test]
+    fn test_count_syllables_unknown_word_falls_back() {
+        let result = count_syllables("flurbledorp");
+        assert!(result >= 1);
+    }
+
+    #[test]
+    fn test_try_count_syllables_known() {
+        assert_eq!(try_count_syllables("hello"), Some(2));
+    }
+
+    #[test]
+    fn test_try_count_syllables_unknown() {
+        assert_eq!(try_count_syllables("asdfghjkl"), None);
+    }
+
+    #[test]
+    fn test_count_syllables_empty() {
+        assert_eq!(count_syllables(""), 0);
+    }
+
+    #[test]
+    fn test_count_syllables_case_insensitive() {
+        assert_eq!(count_syllables("Hello"), count_syllables("hello"));
+        assert_eq!(count_syllables("ELEPHANT"), count_syllables("elephant"));
     }
 }
