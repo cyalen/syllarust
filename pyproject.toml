@@ -4,13 +4,22 @@ build-backend = "maturin"
 
 [project]
 name = "syllarust"
-requires-python = ">=3.8"
-version = "0.2.1"
+requires-python = ">=3.9"
+version = "0.3.0"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 description = "A simple library for quickly counting syllables"
+dependencies = [
+    "syllables==1.1.5",
+]
+
 [tool.maturin]
-features = ["pyo3/extension-module"]
+features = ["python", "pyo3/extension-module"]
+
+[dependency-groups]
+dev = [
+    "maturin>=1.12.6",
+]
